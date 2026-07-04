@@ -18,7 +18,6 @@ var rebootRelevantPaths = []string{
 	"kernel",
 	"initrd",
 	"kernel-params",
-	"systemd",
 }
 
 type Result struct {
