@@ -7,7 +7,6 @@ It resolves the booted system and current system profile, then compares only the
 - `kernel`
 - `initrd`
 - `kernel-params`
-- `systemd`
 
 If any of those paths exists on both sides and resolves to a different target, `nixos_reboot_required` is `1`. Otherwise it is `0`.
 
