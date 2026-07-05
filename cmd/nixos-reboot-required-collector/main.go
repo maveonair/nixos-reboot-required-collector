@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -14,10 +15,15 @@ const (
 	defaultOutputFile    = "/var/lib/node_exporter/textfile_collector/nixos_reboot_required.prom"
 )
 
-var rebootRelevantPaths = []string{
-	"kernel",
-	"initrd",
-	"kernel-params",
+var rebootRelevantPaths = []rebootRelevantPath{
+	{path: "kernel", compare: resolvedPathsDifferIfBothExist},
+	{path: "initrd", compare: resolvedPathsDifferIfBothExist},
+	{path: "kernel-params", compare: fileContentsDifferIfBothExist},
+}
+
+type rebootRelevantPath struct {
+	path    string
+	compare func(leftPath, rightPath string) (bool, error)
 }
 
 type Result struct {
@@ -66,13 +72,13 @@ func checkRebootRequired(bootedSystemPath, currentSystemPath string) (Result, er
 		return Result{}, fmt.Errorf("resolve current system %q: %w", currentSystemPath, err)
 	}
 
-	for _, relativePath := range rebootRelevantPaths {
-		changed, err := pathsDifferIfBothExist(
-			filepath.Join(bootedSystem, relativePath),
-			filepath.Join(currentSystem, relativePath),
+	for _, relevantPath := range rebootRelevantPaths {
+		changed, err := relevantPath.compare(
+			filepath.Join(bootedSystem, relevantPath.path),
+			filepath.Join(currentSystem, relevantPath.path),
 		)
 		if err != nil {
-			return Result{}, fmt.Errorf("check %s: %w", relativePath, err)
+			return Result{}, fmt.Errorf("check %s: %w", relevantPath.path, err)
 		}
 
 		if changed {
@@ -87,7 +93,7 @@ func checkRebootRequired(bootedSystemPath, currentSystemPath string) (Result, er
 	}, nil
 }
 
-func pathsDifferIfBothExist(leftPath, rightPath string) (bool, error) {
+func resolvedPathsDifferIfBothExist(leftPath, rightPath string) (bool, error) {
 	leftExists, err := pathExists(leftPath)
 	if err != nil {
 		return false, err
@@ -113,6 +119,34 @@ func pathsDifferIfBothExist(leftPath, rightPath string) (bool, error) {
 	}
 
 	return leftResolved != rightResolved, nil
+}
+
+func fileContentsDifferIfBothExist(leftPath, rightPath string) (bool, error) {
+	leftExists, err := pathExists(leftPath)
+	if err != nil {
+		return false, err
+	}
+
+	rightExists, err := pathExists(rightPath)
+	if err != nil {
+		return false, err
+	}
+
+	if !leftExists || !rightExists {
+		return false, nil
+	}
+
+	leftContents, err := os.ReadFile(leftPath)
+	if err != nil {
+		return false, fmt.Errorf("read %q: %w", leftPath, err)
+	}
+
+	rightContents, err := os.ReadFile(rightPath)
+	if err != nil {
+		return false, fmt.Errorf("read %q: %w", rightPath, err)
+	}
+
+	return !bytes.Equal(leftContents, rightContents), nil
 }
 
 func resolvePath(path string) (string, error) {

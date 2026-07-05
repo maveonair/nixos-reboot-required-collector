@@ -90,6 +90,47 @@ func TestCheckRebootRequired(t *testing.T) {
 				return bootedSystem, currentSystem
 			},
 		},
+		{
+			name: "same kernel params content does not require reboot",
+			want: false,
+			make: func(t *testing.T, dir string) (string, string) {
+				bootedSystem := mkdir(t, filepath.Join(dir, "booted-system-target"))
+				currentSystem := mkdir(t, filepath.Join(dir, "current-system-target"))
+
+				writeFile(t, filepath.Join(bootedSystem, "kernel-params"), "console=ttyS0 quiet")
+				writeFile(t, filepath.Join(currentSystem, "kernel-params"), "console=ttyS0 quiet")
+
+				return bootedSystem, currentSystem
+			},
+		},
+		{
+			name: "different kernel params content requires reboot",
+			want: true,
+			make: func(t *testing.T, dir string) (string, string) {
+				bootedSystem := mkdir(t, filepath.Join(dir, "booted-system-target"))
+				currentSystem := mkdir(t, filepath.Join(dir, "current-system-target"))
+
+				writeFile(t, filepath.Join(bootedSystem, "kernel-params"), "console=ttyS0 quiet")
+				writeFile(t, filepath.Join(currentSystem, "kernel-params"), "console=ttyS0")
+
+				return bootedSystem, currentSystem
+			},
+		},
+		{
+			name: "different kernel params files with same content do not require reboot",
+			want: false,
+			make: func(t *testing.T, dir string) (string, string) {
+				bootedSystem := mkdir(t, filepath.Join(dir, "booted-system-target"))
+				currentSystem := mkdir(t, filepath.Join(dir, "current-system-target"))
+				bootedParams := writeFile(t, filepath.Join(dir, "booted-kernel-params"), "console=ttyS0 quiet")
+				currentParams := writeFile(t, filepath.Join(dir, "current-kernel-params"), "console=ttyS0 quiet")
+
+				symlink(t, bootedParams, filepath.Join(bootedSystem, "kernel-params"))
+				symlink(t, currentParams, filepath.Join(currentSystem, "kernel-params"))
+
+				return bootedSystem, currentSystem
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -227,6 +268,16 @@ func touch(t *testing.T, path string) string {
 	}
 	if err := file.Close(); err != nil {
 		t.Fatalf("close file %q: %v", path, err)
+	}
+
+	return path
+}
+
+func writeFile(t *testing.T, path, contents string) string {
+	t.Helper()
+
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write file %q: %v", path, err)
 	}
 
 	return path

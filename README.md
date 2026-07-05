@@ -8,7 +8,7 @@ It resolves the booted system and current system profile, then compares only the
 - `initrd`
 - `kernel-params`
 
-If any of those paths exists on both sides and resolves to a different target, `nixos_reboot_required` is `1`. Otherwise it is `0`.
+If `kernel` or `initrd` exists on both sides and resolves to a different target, `nixos_reboot_required` is `1`. If `kernel-params` exists on both sides and has different file contents, it is also `1`. Otherwise it is `0`.
 
 This is useful for NixOS machines using automatic upgrades without automatic reboots:
 
